@@ -4,14 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-This is a newly created PyCharm Python project. It has no source code, dependency manifest, tests, or lint/build configuration yet. Update this file once real code and tooling are added.
+The only real code is `index.html`, an IT PMO Kanban board demo. It is one self-contained file of vanilla HTML, CSS and JS with no build step, dependencies, tests or linter. The Python virtualenv exists but nothing uses it yet.
+
+## Running
+
+Open `index.html` in a browser directly, or serve the folder with `.\.venv\Scripts\python.exe -m http.server` and browse to http://localhost:8000.
+
+## index.html layout
+
+- `<style>` at the top holds all CSS. Priority colours are applied through `card--<priority>` classes.
+- The markup has a summary bar (`sum-*` ids), an Add Task side panel (`#task-panel`, form fields `f-*` with error spans `e-*`), a filter bar (`filter-*`) and four columns (`.column[data-status]`).
+- The `<script>` at the bottom has:
+  - Config constants: `FORMSUBMIT_ENDPOINT` (a placeholder email that must be replaced before notifications work), `TASK_ID_PREFIX`, `NOTIFY_TIMEOUT_MS`.
+  - Domain lists: `STATUSES`, `PRIORITIES`, `PROJECTS`, `CATEGORIES`. The selects are populated from these, so add values here rather than in the markup.
+  - State: tasks are kept in memory only and reseeded by `seedTasks()` on every load. Nothing is persisted.
+  - Rendering: `renderBoard()` re-renders everything from state, and `renderCard()` builds each card. User text must go through `escapeHtml()`.
+  - Mutations: `addTask`, `moveTask` and `deleteTask` update state and then re-render. Cards move by drag and drop or through the per-card "move" select, which is the keyboard path.
+  - `notifyNewTask()` POSTs new tasks to FormSubmit. A failure only shows a toast and does not block adding the task.
 
 ## Environment
 
 - Platform: Windows. The project folder is inside OneDrive.
-- Interpreter: CPython 3.11.0 in the project virtualenv at `.venv` (it was built from a local install at `..\python-3.11.0`). Only pip, setuptools and wheel are installed.
-- Run Python through the venv rather than any global interpreter:
+- Git repo on `main`. `.venv/`, `.idea/` and `__pycache__/` are gitignored.
+- Interpreter: CPython 3.11.0 in `.venv`, which only has pip, setuptools and wheel. Run Python through the venv:
   - PowerShell: `.\.venv\Scripts\python.exe`
   - Git Bash: `.venv/Scripts/python.exe`
-- Install packages with `.\.venv\Scripts\python.exe -m pip install <pkg>`.
-- PyCharm settings live in `.idea/`, and `.venv` is excluded from indexing. The project is not a git repository yet.

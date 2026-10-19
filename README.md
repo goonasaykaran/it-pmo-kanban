@@ -17,9 +17,13 @@ A single-page Kanban board for tracking IT project tasks across Backlog, In Prog
 - Move cards by drag and drop, or with the per-card "Move to" dropdown, which works from the keyboard
 - Add Task form with validation (title, project, category, assignee, priority, status, due date)
 - Filter by project, assignee and priority
-- Live summary of totals per column and overdue tasks
+- Live summary of totals per column and overdue tasks, with a progress ring for completion and on-time rate
+- "Focus now" list that ranks the riskiest tasks (overdue, critical, blocked, high), plus a scrolling alerts ticker
+- Animated charts: status split, deadline radar (open tasks by days to due), priority load and per-person load
+- Live activity feed and clock; click a focus item or radar dot to jump to its card
+- Dark "command centre" design with animation that switches off when the system asks for reduced motion
 - Optional email notification for new tasks via [FormSubmit](https://formsubmit.co)
-- Plain HTML, CSS and JavaScript in one file, with no dependencies or build step
+- Plain HTML, CSS and JavaScript in one file, with no JavaScript libraries or build step (fonts load from Google Fonts)
 
 Tasks are kept in memory only. Reloading the page resets the board to 8 sample tasks.
 

@@ -25,6 +25,10 @@ Open `index.html` in a browser directly, or serve the folder with `.\.venv\Scrip
   - Mutations: `addTask`, `moveTask` and `deleteTask` update state and then re-render. `moveTask` warns when a column goes over its WIP limit. Cards move by drag and drop or through the per-card "move" select, which is the keyboard path.
   - `notifyNewTask()` POSTs new tasks to FormSubmit. A failure only shows a toast and does not block adding the task.
 
+## Hooks
+
+`.claude/settings.json` registers a PostToolUse hook ("Site Guard", `.claude/hooks/check-site.mjs`) on Write/Edit. When `index.html` changes it checks that the inline scripts parse, every `getElementById` target exists, ids are unique, `WHATSAPP_NUMBER` is digits-only international format, and external scripts pin a version. On success it shows a one-line report; on failure it exits 2 so the problems must be fixed before continuing.
+
 ## Environment
 
 - Platform: Windows. The project folder is inside OneDrive.

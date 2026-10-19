@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-site.mjs\"",
+            "timeout": 5,
+            "statusMessage": "Site Guard scanning index.html"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,28 +1,31 @@
 // Site Guard: a PostToolUse hook that scans index.html after every Claude edit.
 // Pass: shows a one-line report card. Fail: exit 2 sends the problems back to
 // Claude so it fixes them before moving on.
-import { readFileSync } from "node:fs";
-import { spawn } from "node:child_process";
+import { readFileSync, appendFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import vm from "node:vm";
 
-// Pops a Windows desktop notification in the background so the hook stays fast
-function notify(title, text, ok) {
+// Run log so you can confirm the hook fired: %TEMP%\site-guard.log
+const LOG = join(tmpdir(), "site-guard.log");
+const log = line => { try { appendFileSync(LOG, `${new Date().toISOString()} ${line}\n`); } catch {} };
+
+// Windows toast notification. It is handed to Windows before the hook exits,
+// so it stays on screen (and in Notification Centre) after the hook finishes.
+function notify(title, text) {
   if (process.platform !== "win32") return;
   const q = s => s.replace(/'/g, "''");
   const ps = [
-    "Add-Type -AssemblyName System.Windows.Forms, System.Drawing",
-    "$n = New-Object System.Windows.Forms.NotifyIcon",
-    `$n.Icon = [System.Drawing.SystemIcons]::${ok ? "Shield" : "Error"}`,
-    `$n.BalloonTipTitle = '${q(title)}'`,
-    `$n.BalloonTipText = '${q(text)}'`,
-    `$n.BalloonTipIcon = '${ok ? "Info" : "Error"}'`,
-    "$n.Visible = $true",
-    "$n.ShowBalloonTip(6000)",
-    "Start-Sleep -Seconds 7",
-    "$n.Dispose()"
+    "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null",
+    "$xml = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)",
+    "$t = $xml.GetElementsByTagName('text')",
+    `$t.Item(0).AppendChild($xml.CreateTextNode('${q(title)}')) > $null`,
+    `$t.Item(1).AppendChild($xml.CreateTextNode('${q(text)}')) > $null`,
+    "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe').Show([Windows.UI.Notifications.ToastNotification]::new($xml))"
   ].join("; ");
-  spawn("powershell.exe", ["-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
-    { detached: true, stdio: "ignore", windowsHide: true }).unref();
+  const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", ps], { windowsHide: true, timeout: 4000 });
+  log(`toast ${r.status === 0 ? "sent" : "failed: " + String(r.stderr || r.error).trim()}`);
 }
 
 const started = performance.now();
@@ -65,14 +68,16 @@ if (unpinned.length) problems.push(`External scripts without a pinned version: $
 
 const ms = Math.round(performance.now() - started);
 if (problems.length) {
-  notify("🚨 Site Guard blocked an edit", `${problems.length} problem${problems.length === 1 ? "" : "s"} in index.html. Claude is fixing it.\n${problems[0]}`, false);
+  log(`BLOCKED ${problems.length} problem(s): ${problems.join(" | ")}`);
+  notify("🚨 Site Guard blocked an edit", `${problems.length} problem${problems.length === 1 ? "" : "s"} in index.html. Claude is fixing it. ${problems[0]}`);
   process.stderr.write(`🚨 SITE GUARD BLOCKED the edit to index.html (${problems.length} problem${problems.length === 1 ? "" : "s"}):\n- ${problems.join("\n- ")}\nFix these before continuing.\n`);
   process.exit(2);
 }
 
 const kb = (Buffer.byteLength(html) / 1024).toFixed(0);
 const phone = wa[1].replace(/^(\d{2})(\d{4})(\d{4})$/, "+$1 $2 $3");
-notify("🛡️ Site Guard: index.html cleared", `Checked in ${ms}ms. JS parses, ${wanted.size} elements wired, WhatsApp → ${phone}. Safe to ship 🚀`, true);
+log(`PASSED in ${ms}ms`);
+notify("🛡️ Site Guard: index.html cleared", `Checked in ${ms}ms. JS parses, ${wanted.size} elements wired, WhatsApp → ${phone}. Safe to ship 🚀`);
 process.stdout.write(JSON.stringify({
   suppressOutput: true,
   systemMessage: `🛡️ SITE GUARD ✅ index.html cleared in ${ms}ms · JS parses · ${wanted.size} element hooks wired · 0 duplicate ids · WhatsApp → ${phone} · ${kb} KB · safe to ship 🚀`

@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-site.mjs\"",
-            "timeout": 5,
+            "timeout": 10,
             "statusMessage": "Site Guard scanning index.html"
           }
         ]

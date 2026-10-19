@@ -17,15 +17,21 @@ A single-page Kanban board for tracking IT project tasks across Backlog, In Prog
 - Move cards by drag and drop, or with the per-card "Move to" dropdown, which works from the keyboard
 - Add Task form with validation (title, project, category, assignee, priority, status, due date)
 - Filter by project, assignee and priority
-- Live summary of totals per column and overdue tasks, with a progress ring for completion and on-time rate
-- "Focus now" list that ranks the riskiest tasks (overdue, critical, blocked, high), plus a scrolling alerts ticker
-- Animated charts: status split, deadline radar (open tasks by days to due), priority load and per-person load
-- Live activity feed and clock; click a focus item or radar dot to jump to its card
-- Dark "command centre" design with animation that switches off when the system asks for reduced motion
+- Work-in-progress limits on In Progress and Blocked, with due-date countdowns on every card
+- Squad-lead dashboard for a banking IT team, with demo data ranging from green to critical:
+  - Lead's briefing: a ranked list of what needs action today, plus KPI tiles with trend lines
+  - Portfolio RAG table: progress, schedule slip, budget burn vs plan and next milestone per workstream
+  - Past delivery: velocity vs commitment, sprint burndown, cumulative flow and cycle-time charts
+  - Forecast: a Monte Carlo simulation of the release date against a regulatory deadline, with the scope cut or extra capacity needed to hit it
+  - Roadmap timeline with milestones, month-end batch windows and the year-end change freeze
+  - Risk heatmap, incident restore times against SLA, compliance calendar and team capacity
+- Live delivery-health score that updates as cards move
+- Floating WhatsApp chat button (set your number in `WHATSAPP_NUMBER`)
+- Strata-style layout with scroll-triggered chart animation that switches off when the system asks for reduced motion
 - Optional email notification for new tasks via [FormSubmit](https://formsubmit.co)
 - Plain HTML, CSS and JavaScript in one file, with no JavaScript libraries or build step (fonts load from Google Fonts)
 
-Tasks are kept in memory only. Reloading the page resets the board to 8 sample tasks.
+Tasks are kept in memory only. Reloading the page resets the board to 12 sample tasks. The dashboard figures are demo data.
 
 ## Installation
 

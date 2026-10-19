@@ -27,7 +27,7 @@ Open `index.html` in a browser directly, or serve the folder with `.\.venv\Scrip
 
 ## Hooks
 
-`.claude/settings.json` registers a PostToolUse hook ("Site Guard", `.claude/hooks/check-site.mjs`) on Write/Edit. When `index.html` changes it checks that the inline scripts parse, every `getElementById` target exists, ids are unique, `WHATSAPP_NUMBER` is digits-only international format, and external scripts pin a version. On success it shows a one-line report; on failure it exits 2 so the problems must be fixed before continuing.
+`.claude/settings.json` registers a PostToolUse hook ("Site Guard", `.claude/hooks/check-site.mjs`) on Write/Edit. When `index.html` changes it checks that the inline scripts parse, every `getElementById` target exists, ids are unique, `WHATSAPP_NUMBER` is digits-only international format, and external scripts pin a version. On success it shows a one-line report; on failure it exits 2 so the problems must be fixed before continuing. Either way it also pops a Windows desktop notification, spawned in the background so the hook stays fast.
 
 ## Environment
 

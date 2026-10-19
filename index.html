@@ -663,6 +663,43 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 .toast--warning { border-left-color: var(--amber); }
 @keyframes toast-in { from { transform: translateY(12px); opacity: 0; } }
 
+/* Page hooks: live feed of hook events, bottom-left of the content column */
+.hooklog { position: fixed; left: calc(var(--side-w) + var(--space-5)); bottom: var(--space-5); z-index: 55; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: var(--space-2); max-width: min(340px, calc(100vw - 120px)); pointer-events: none; }
+.hooklog__pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px 4px 8px;
+  border-radius: 999px;
+  background: var(--side-bg);
+  color: var(--side-ink);
+  box-shadow: var(--shadow-lg);
+  font-size: 12px; font-weight: 600;
+  pointer-events: auto;
+}
+.hooklog__pill b { color: #ffd34d; }
+.hooklog__pill.is-bump { animation: bump 500ms cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes bump { 40% { transform: scale(1.15); } }
+.hookev {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-left: 4px solid #f0b400;
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  animation: hook-in 420ms cubic-bezier(.3, 1.4, .5, 1) both;
+}
+.hookev.is-leaving { animation: hook-out 400ms ease-in both; }
+.hookev__bolt { grid-row: span 2; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #fff4cc; color: #b07d00; font-size: 15px; animation: zap 900ms ease-out; }
+.hookev__name { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--ink); }
+.hookev__what { color: var(--ink-2); font-size: 12px; overflow-wrap: anywhere; }
+@keyframes hook-in { from { transform: translateX(-30px) scale(0.9); opacity: 0; } }
+@keyframes hook-out { to { transform: translateX(-30px); opacity: 0; } }
+@keyframes zap { 0% { box-shadow: 0 0 0 0 rgba(240, 180, 0, 0.7); } 100% { box-shadow: 0 0 0 14px rgba(240, 180, 0, 0); } }
+.wa__bubble--mine { margin: var(--space-2) 0 0 auto; border-radius: 8px 0 8px 8px; background: #d9fdd3; }
+.wa__bubble small { display: block; margin-bottom: 2px; color: #1f8a5b; font-size: 11px; font-weight: 700; }
+.confetti { position: fixed; inset: 0; z-index: 80; pointer-events: none; }
+
 /* =========================================================
    11. Floating WhatsApp widget
    ========================================================= */
@@ -1236,6 +1273,7 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 
 <div class="tip" id="tip" role="tooltip" hidden></div>
 <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+<div class="hooklog" id="hooklog" aria-live="polite" aria-label="Page hook activity"></div>
 
 <!-- =========================================================
      FORMSUBMIT CONFIG
@@ -1257,6 +1295,10 @@ const NOTIFY_TIMEOUT_MS = 15000;
 // WhatsApp: international format, digits only (country code first, no +)
 const WHATSAPP_NUMBER = "6581124980";
 const WHATSAPP_MESSAGE = "Hi IT PMO desk, I have a question about the Sprint 24 board.";
+
+// Page hooks: optional URL that receives every hook event as a JSON POST
+// (e.g. a webhook.site, Zapier or Power Automate URL). Empty = off.
+const HOOK_WEBHOOK_URL = "";
 
 /* =========================================================
    2. Reference data
@@ -2217,12 +2259,14 @@ function addTask(fields) {
   state.syncedAt = Date.now();
   renderBoard();
   flashCard(task.id, false);
+  fireHook("task.added", { task });
   return task;
 }
 
 function moveTask(id, status, focusSelector) {
   const task = state.tasks.find(t => t.id === id);
   if (!task || !STATUSES.includes(status) || task.status === status) return;
+  const from = task.status;
   task.status = status;
   state.pendingDeleteId = null;
   state.syncedAt = Date.now();
@@ -2232,6 +2276,8 @@ function moveTask(id, status, focusSelector) {
   if (limit && n > limit) showToast(`${task.id} moved to ${status}. ${status} is over its WIP limit (${n}/${limit}).`, "warning");
   else showToast(`${task.id} moved to ${status}.`);
   flashCard(task.id, false);
+  fireHook("task.moved", { task, from, to: status });
+  if (limit && n > limit) fireHook("wip.breached", { column: status, count: n, limit });
 }
 
 function deleteTask(id) {
@@ -2242,6 +2288,7 @@ function deleteTask(id) {
   state.syncedAt = Date.now();
   renderBoard(`#${CSS.escape(columnHeadingId(task.status))}`);
   showToast(`${task.id} deleted.`);
+  fireHook("task.deleted", { task });
 }
 
 function columnHeadingId(status) {
@@ -2556,6 +2603,7 @@ function initMotion() {
   // Scroll-spy for the sidebar nav
   const spy = new IntersectionObserver(entries => entries.forEach(e => {
     if (!e.isIntersecting) return;
+    state.viewing = e.target.id;
     navLinks.forEach(a => a.classList.toggle("is-active", a.getAttribute("href") === `#${e.target.id}`));
   }), { rootMargin: "-40% 0px -55% 0px" });
   sections.forEach(s => spy.observe(s));
@@ -2577,6 +2625,10 @@ function initTooltips() {
   document.addEventListener("click", e => {
     const target = e.target.closest("[data-focus]");
     if (target) flashCard(target.dataset.focus, true);
+    // Remember the last card the user engaged with, for the WhatsApp context hook
+    const card = target ? null : e.target.closest(".task");
+    const id = target?.dataset.focus || card?.dataset.id;
+    if (id) state.lastCardId = id;
   });
 }
 
@@ -2602,28 +2654,146 @@ function initWhatsApp() {
   const body = document.getElementById("wa-body");
   const start = document.getElementById("wa-start");
   start.href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
-  let greeted = false;
   const setOpen = open => {
     card.hidden = !open;
     btn.setAttribute("aria-expanded", String(open));
     const badge = btn.querySelector(".wa__badge");
     if (badge) badge.remove();
-    if (open && !greeted) {
-      greeted = true;
-      setTimeout(() => {
-        const time = new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
-        body.innerHTML = `<div class="wa__bubble">Hi there! Need an update on a task, a release date or a blocker? Message the PMO desk and we'll get back to you.<time>${time}</time></div>`;
-      }, REDUCED_MOTION ? 0 : 1100);
+    if (open) {
+      fireHook("whatsapp.opened", { section: state.viewing || "overview", cardId: state.lastCardId || null });
+      start.focus();
     }
-    if (open) start.focus();
   };
   btn.addEventListener("click", () => setOpen(card.hidden));
   document.getElementById("wa-close").addEventListener("click", () => { setOpen(false); btn.focus(); });
+  start.addEventListener("click", () => fireHook("whatsapp.chat-started", { message: state.waMessage || WHATSAPP_MESSAGE }));
 }
 
 /* =========================================================
-   21. Boot
+   21. Page hooks: user actions fire named hooks, and
+       handlers registered with onHook() react to them
    ========================================================= */
+const hookHandlers = {};
+let hookCount = 0;
+
+function onHook(name, handler) {
+  (hookHandlers[name] ||= []).push(handler);
+}
+
+function fireHook(name, detail = {}) {
+  const event = { name, at: new Date().toISOString(), ...detail };
+  [...(hookHandlers[name] || []), ...(hookHandlers["*"] || [])].forEach(handler => {
+    try { handler(event); } catch (err) { console.error(`Hook handler for ${name} failed:`, err); }
+  });
+}
+
+// Builds a WhatsApp message from what the user is looking at
+function whatsappContext({ section, cardId }) {
+  const task = cardId && state.tasks.find(t => t.id === cardId);
+  if (task) {
+    const days = daysUntil(task.dueDate);
+    const when = task.status === "Done" ? "done" : days < 0 ? `${-days} days late` : `due ${dayLabel(days)}`;
+    return `Hi PMO desk, question about ${task.id} "${task.title}" (${task.priority}, ${task.status}, ${when}, owner ${task.assignee}).`;
+  }
+  const A = ANALYTICS;
+  const byView = {
+    forecast: `Hi PMO desk, I'm looking at the Release 4.3 forecast: ${Math.round(A.prob * 100)}% chance of meeting the ${dayLabel(RELEASE.deadline)} regulatory date. Can we discuss the descope option (${A.descope} pts)?`,
+    portfolio: `Hi PMO desk, question on the portfolio: ${WORKSTREAMS.filter(w => w.rag === "Critical" || w.rag === "Red").map(w => `${w.name} (${w.rag})`).join(", ")} need attention.`,
+    team: `Hi PMO desk, ${TEAM.filter(p => p.allocated > p.capacity).map(p => p.name).join(" and ")} are over capacity this sprint. Can we rebalance?`,
+    risk: `Hi PMO desk, question on risk & compliance: ${COMPLIANCE.filter(c => c.day < 0).map(c => c.title).join(", ") || "upcoming regulatory dates"}.`,
+    delivery: `Hi PMO desk, Sprint 24 is projected to carry over ${A.carryOver} pts. Can we agree the scope cut?`,
+    roadmap: `Hi PMO desk, question on the roadmap: Release 4.3 go-live is ${FREEZE.start - RELEASE.deadline} days before the change freeze.`
+  };
+  return byView[section] ||
+    `Hi PMO desk, board health is ${A.score}/100 (${ragFor(A.score)}): ${A.overdue.length} overdue and ${A.blocked.length} blocked items. Can we talk?`;
+}
+
+function showHookEvent(name, what) {
+  const log = document.getElementById("hooklog");
+  hookCount++;
+  let pill = log.querySelector(".hooklog__pill");
+  if (!pill) {
+    pill = document.createElement("span");
+    pill.className = "hooklog__pill";
+    log.appendChild(pill);
+  }
+  pill.innerHTML = `⚡ <b>${hookCount}</b> hook${hookCount === 1 ? "" : "s"} fired`;
+  pill.classList.remove("is-bump"); void pill.offsetWidth; pill.classList.add("is-bump");
+  const ev = document.createElement("div");
+  ev.className = "hookev";
+  ev.innerHTML = `<span class="hookev__bolt" aria-hidden="true">⚡</span><span class="hookev__name">${escapeHtml(name)}</span><span class="hookev__what">${escapeHtml(what)}</span>`;
+  log.appendChild(ev);
+  [...log.querySelectorAll(".hookev")].slice(0, -3).forEach(old => old.remove());
+  setTimeout(() => { ev.classList.add("is-leaving"); setTimeout(() => ev.remove(), 400); }, 6000);
+}
+
+function confetti() {
+  if (REDUCED_MOTION) return;
+  const canvas = document.createElement("canvas");
+  canvas.className = "confetti";
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext("2d");
+  const colors = ["#49bf9d", "#2389e2", "#f0b400", "#7347af", "#e04a2f"];
+  const bits = Array.from({ length: 120 }, () => ({
+    x: innerWidth * (0.45 + Math.random() * 0.2), y: innerHeight * 0.55,
+    vx: (Math.random() - 0.5) * 14, vy: -Math.random() * 14 - 4,
+    r: Math.random() * 6 + 3, c: colors[Math.floor(Math.random() * colors.length)], a: Math.random() * 6
+  }));
+  const start = performance.now();
+  const frame = now => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    bits.forEach(b => {
+      b.vy += 0.35; b.x += b.vx; b.y += b.vy; b.a += 0.2;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.fillStyle = b.c;
+      ctx.fillRect(-b.r / 2, -b.r / 2, b.r, b.r * 0.6); ctx.restore();
+    });
+    if (now - start < 1800) requestAnimationFrame(frame); else canvas.remove();
+  };
+  requestAnimationFrame(frame);
+}
+
+function initHooks() {
+  // WhatsApp opened: pre-fill a message that matches what the user is looking at
+  onHook("whatsapp.opened", ({ section, cardId }) => {
+    const message = whatsappContext({ section, cardId });
+    state.waMessage = message;
+    document.getElementById("wa-start").href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+    const time = new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+    const body = document.getElementById("wa-body");
+    body.innerHTML = `<div class="wa__typing" aria-hidden="true"><i></i><i></i><i></i></div>`;
+    setTimeout(() => {
+      body.innerHTML = `<div class="wa__bubble">Hi there! Need an update on a task, a release date or a blocker? Message the PMO desk.<time>${time}</time></div>
+        <div class="wa__bubble wa__bubble--mine"><small>Your message, ready to send</small>${escapeHtml(message)}<time>${time}</time></div>`;
+    }, REDUCED_MOTION ? 0 : 900);
+    showHookEvent("whatsapp.opened", cardId ? `Context: card ${cardId}` : `Context: ${section} section`);
+  });
+  onHook("whatsapp.chat-started", () => showHookEvent("whatsapp.chat-started", "Opening WhatsApp with the pre-filled message"));
+
+  // Board actions
+  onHook("task.added", ({ task }) => showHookEvent("task.added", `${task.id} added to ${task.status}`));
+  onHook("task.deleted", ({ task }) => showHookEvent("task.deleted", `${task.id} removed from ${task.status}`));
+  onHook("task.moved", ({ task, from, to }) => {
+    showHookEvent("task.moved", `${task.id}: ${from} → ${to}`);
+    if (to === "Done") { confetti(); showHookEvent("task.completed", `${task.id} done. Health now ${ANALYTICS.score}/100`); }
+    if (to === "Blocked") showHookEvent("lead.alerted", `${task.id} blocked. Added to the lead's briefing`);
+  });
+  onHook("wip.breached", ({ column, count, limit }) => showHookEvent("wip.breached", `${column} at ${count}/${limit}. Finish before starting more`));
+
+  // Every hook: console trace, plus the optional webhook
+  onHook("*", event => {
+    console.info("[hook]", event.name, event);
+    if (!HOOK_WEBHOOK_URL) return;
+    const payload = { ...event, task: event.task ? { id: event.task.id, title: event.task.title, status: event.task.status } : undefined };
+    fetch(HOOK_WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), keepalive: true })
+      .catch(err => console.warn("Hook webhook failed:", err));
+  });
+}
+
+/* =========================================================
+   22. Boot
+   ========================================================= */
+initHooks();
 seedTasks();
 computeStaticAnalytics();
 renderPortfolio();

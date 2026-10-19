@@ -26,7 +26,8 @@ A single-page Kanban board for tracking IT project tasks across Backlog, In Prog
   - Roadmap timeline with milestones, month-end batch windows and the year-end change freeze
   - Risk heatmap, incident restore times against SLA, compliance calendar and team capacity
 - Live delivery-health score that updates as cards move
-- Floating WhatsApp chat button (set your number in `WHATSAPP_NUMBER`)
+- Floating WhatsApp chat button (set your number in `WHATSAPP_NUMBER`) that pre-fills a message about whatever the visitor is looking at
+- Page hooks: user actions (opening WhatsApp, moving, adding or deleting cards, breaching a WIP limit) fire named hooks, shown in a live "hooks fired" feed and optionally sent to a webhook (`HOOK_WEBHOOK_URL`)
 - Strata-style layout with scroll-triggered chart animation that switches off when the system asks for reduced motion
 - Optional email notification for new tasks via [FormSubmit](https://formsubmit.co)
 - Plain HTML, CSS and JavaScript in one file, with no JavaScript libraries or build step (fonts load from Google Fonts)

@@ -622,7 +622,7 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
    1. CONFIG: change the email address here (one place only)
    ========================================================= */
 const FORMSUBMIT_ENDPOINT = "https://formsubmit.co/ajax/YOUR_EMAIL@example.com";
-const TASK_ID_PREFIX = "UOB-ITPM-";
+const TASK_ID_PREFIX = "ITPM-";
 const NOTIFY_TIMEOUT_MS = 15000;
 
 /* =========================================================
@@ -883,7 +883,7 @@ async function notifyNewTask(task) {
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
-        _subject: `[UOB IT PMO] New task ${task.id}: ${task.title}`,
+        _subject: `[IT PMO] New task ${task.id}: ${task.title}`,
         _template: "table",
         _captcha: "false",
         "Task ID": task.id,

@@ -1,3 +1,13 @@
 .venv/
+venv/
 .idea/
+.vscode/
 __pycache__/
+node_modules/
+.env
+.env.*
+*.pem
+*.key
+*.log
+.DS_Store
+.claude/settings.local.json
